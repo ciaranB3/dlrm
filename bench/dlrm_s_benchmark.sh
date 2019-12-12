@@ -145,3 +145,5 @@ if [ $gpu = 1 ]; then
     fi
   done
 fi
+
+cmd \k

@@ -80,6 +80,8 @@ from quorem.qr_embedding_bag import QREmbeddingBag
 # import torch.nn.functional as Functional
 # from torch.nn.parameter import Parameter
 
+import os
+
 exc = getattr(builtins, "IOError", "FileNotFoundError")
 
 
@@ -407,11 +409,31 @@ class DLRM_Net(nn.Module):
 
         return z0
 
+all_layers = []
+layerType = []
+layerName = []
+instancesPerType = {}
+def getLayers(network):
+    for layer in network.children():
+        if list(layer.children()) != []:#type(layer) == nn.Sequential: # if sequential layer, apply recursively to layers in sequential layer
+            getLayers(layer)
+        else: # if leaf node, add it to list
+            all_layers.append(layer)
+            layerType.append(layer.__class__.__name__.split('.')[-1])
+            #print(layerType[-1])
+            if layerType[-1] in instancesPerType:
+                instancesPerType[layerType[-1]] += 1
+            else:
+                instancesPerType[layerType[-1]] = 1
+            layerName.append(layerType[-1] + '_' + str(instancesPerType[layerType[-1]]))
+
 
 if __name__ == "__main__":
     ### import packages ###
     import sys
     import argparse
+
+    print("Starting...")
 
     ### parse arguments ###
     parser = argparse.ArgumentParser(
@@ -768,6 +790,18 @@ if __name__ == "__main__":
             )
         )
 
+    # print("\n\n")
+    # print('Model layers:\n')
+    # getLayers(dlrm)
+    # for l,layer in enumerate(all_layers):
+    #     print ('Layer {} Type {}'.format(layerName[l],layerType[l]))
+    #     if layerType[l] == 'EmbeddingBag' :
+    #         print("Saving embedding of size {}".format(layer.weight.data.cpu().numpy().size))
+    #         np.save('../traces/' + layerName[l] + '.npy', layer.weight.data.cpu().numpy())
+
+
+    # exit()
+
     print("time/loss/accuracy (if enabled):")
     with torch.autograd.profiler.profile(args.enable_profiling, use_gpu) as prof:
         while k < args.nepochs:
@@ -959,7 +993,28 @@ if __name__ == "__main__":
 
     # export the model in onnx
     if args.save_onnx:
-        with open("dlrm_s_pytorch.onnx", "w+b") as dlrm_pytorch_onnx_file:
+        # if not (args.save_model == ""):
+        #     print("Saving model to {}".format(args.save_model))
+        #     torch.save(
+        #         {
+        #             "epoch": k,
+        #             "nepochs": args.nepochs,
+        #             "nbatches": nbatches,
+        #             "nbatches_test": nbatches_test,
+        #             "iter": j + 1,
+        #             "state_dict": dlrm.state_dict(),
+        #             "train_acc": gA,
+        #             "train_loss": gL,
+        #             "test_acc": gA_test,
+        #             "test_loss": gL_test,
+        #             "total_loss": total_loss,
+        #             "total_accu": total_accu,
+        #             "opt_state_dict": optimizer.state_dict(),
+        #         },
+        #         args.save_model,
+        #     )
+                            
+        with open("dlrm_s_pytorch_qr.onnx", "w+b") as dlrm_pytorch_onnx_file:
             (X, lS_o, lS_i, _) = train_data[0]  # get first batch of elements
             torch.onnx._export(
                 dlrm, (X, lS_o, lS_i), dlrm_pytorch_onnx_file, verbose=True
